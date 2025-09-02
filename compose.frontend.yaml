@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_ENVIRONMENT: ${VITE_ENVIRONMENT}
+        VITE_APP_NAME: ${VITE_APP_NAME}
+    ports:
+      - "3000:80"
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+      VITE_ENVIRONMENT: ${VITE_ENVIRONMENT}
+      VITE_APP_NAME: ${VITE_APP_NAME}
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
