@@ -11,11 +11,17 @@ export default [
   { ignores: ['dist', 'node_modules', 'coverage'] },
 
   {
+    files: ['**/*.{js,jsx,ts,tsx,mjs,cjs}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: { ...globals.browser, ...globals.node },
       parser: tseslint.parser,
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint.plugin,
