@@ -1,6 +1,8 @@
 import { Button, PasswordInput, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
+import { apiClient } from '@/app/api/axios';
+
 export default function LoginForm() {
   const form = useForm({
     initialValues: {
@@ -13,8 +15,14 @@ export default function LoginForm() {
     },
   });
 
-  const handleSubmit = (values: typeof form.values) => {
+  const handleSubmit = async (values: typeof form.values) => {
     console.log('Login:', values);
+    try {
+      const res = await apiClient.post('/auth/login', values);
+      console.log('Login response:', res.data);
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
   };
 
   return (
