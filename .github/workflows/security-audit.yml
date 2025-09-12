@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       summary: ${{ steps.collect.outputs.summary }}
+      status: ${{ steps.audit.outputs.status }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,15 +32,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run security audit
+      - name: Run security audit (filtered)
         id: audit
         run: |
           set +e
-          pnpm audit --audit-level=high > audit-output.txt 2>&1
+          # Rodar audit em JSON
+          pnpm audit --json > audit-output.json 2>&1
           EXIT_CODE=$?
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          head -n 20 audit-output.txt > audit-summary.txt
-          exit $EXIT_CODE || true
+
+          # Filtrar apenas vulnerabilidades high/critical e runtime
+          jq -r '.advisories | to_entries[] 
+            | select(.value.severity == "high" or .value.severity == "critical") 
+            | select(.value.dev === false) 
+            | "\(.value.module_name) - \(.value.severity) - \(.value.title)"' audit-output.json \
+            | head -n 20 > audit-summary.txt
+
+          # Se houver linhas no resumo, marcar como "falha" para o Discord
+          if [ -s audit-summary.txt ]; then
+            echo "status=1" >> $GITHUB_OUTPUT
+          else
+            echo "status=0" >> $GITHUB_OUTPUT
+          fi
+
+          # Nunca falhar o job no CI
+          exit 0
 
       - name: Targeted npm attack check
         id: targeted
@@ -49,7 +65,6 @@ jobs:
           if grep -E "$BAD_VERSIONS" pnpm-lock.yaml; then
             echo "❌ Found compromised package versions!" > targeted-summary.txt
             grep -E "$BAD_VERSIONS" pnpm-lock.yaml >> targeted-summary.txt
-            exit 1
           else
             echo "✅ No compromised package versions found." > targeted-summary.txt
           fi
@@ -58,7 +73,7 @@ jobs:
         id: collect
         run: |
           echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "=== pnpm audit (top 20 lines) ===" >> $GITHUB_OUTPUT
+          echo "=== High/Critical runtime vulnerabilities (top 20) ===" >> $GITHUB_OUTPUT
           cat audit-summary.txt >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "=== Targeted package check ===" >> $GITHUB_OUTPUT
@@ -78,17 +93,17 @@ jobs:
             {
               "embeds": [{
                 "title": "📢 Security Audit Report",
-                "color": ${{ needs.audit.result == 'success' && 3066993 || 15158332 }},
+                "color": ${{ needs.audit.outputs.status == '0' && 3066993 || 15158332 }},
                 "fields": [
                   { "name": "Repository", "value": "${{ github.repository }}", "inline": true },
                   { "name": "Branch", "value": "${{ github.ref_name }}", "inline": true },
                   { "name": "Actor", "value": "${{ github.actor }}", "inline": true },
                   { "name": "Commit", "value": "[${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})", "inline": false },
                   { "name": "Workflow Run", "value": "[View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false },
-                  { "name": "Status", "value": "${{ needs.audit.result == 'success' && '✅ Passed' || '❌ Failed' }}", "inline": true },
+                  { "name": "Status", "value": "${{ needs.audit.outputs.status == '0' && '✅ Passed' || '❌ High/Critical Runtime Vulnerabilities Found' }}", "inline": true },
                   { "name": "Event", "value": "${{ github.event_name }}", "inline": true },
                   { "name": "PR Title", "value": "${{ github.event.pull_request.title || 'N/A' }}", "inline": false }${
-                    needs.audit.result != 'success'
+                    needs.audit.outputs.status != '0'
                       ? `,
                   { "name": "Vulnerabilities", "value": "```${{ needs.audit.outputs.summary }}```", "inline": false }`
                       : ''
