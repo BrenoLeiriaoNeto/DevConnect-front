@@ -1,0 +1,17 @@
+.nebula {
+  background: radial-gradient(circle at top left, #0d0d1a 0%, #1a1a33 40%, #0b0f2d 80%);
+  background-size: 200% 200%;
+  animation: nebulaShift 15s ease infinite;
+}
+
+@keyframes nebulaShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
