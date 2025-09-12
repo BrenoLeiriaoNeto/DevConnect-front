@@ -1,26 +1,10 @@
-import axios, { AxiosHeaders } from 'axios';
+import axios from 'axios';
 
-import type { InternalAxiosRequestConfig } from 'axios';
-
-const PUBLIC_PATHS = ['/login', '/register'];
+import { setupAxiosInterceptors } from '@/shared/api/setupAxiosInterceptors';
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_URL,
+  withCredentials: true,
 });
 
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (typeof config.url === 'string' && PUBLIC_PATHS.some((path) => config.url?.endsWith(path))) {
-    return config;
-  }
-
-  const token = localStorage.getItem('jwt');
-  if (token) {
-    const headers = new AxiosHeaders(config.headers);
-
-    headers.set('Authorization', `Bearer ${token}`);
-
-    config.headers = headers;
-  }
-
-  return config;
-});
+setupAxiosInterceptors(apiClient);

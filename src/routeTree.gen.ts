@@ -9,18 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root';
+import { Route as ProtectedRouteImport } from './routes/protected';
 import { Route as LoginRouteImport } from './routes/login';
-import { Route as DashboardRouteImport } from './routes/dashboard';
+import { Route as BridgeRouteImport } from './routes/bridge';
 import { Route as IndexRouteImport } from './routes/index';
+import { Route as ProtectedDashboardRouteImport } from './routes/protected/dashboard';
 
+const ProtectedRoute = ProtectedRouteImport.update({
+  id: '/protected',
+  path: '/protected',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any);
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const BridgeRoute = BridgeRouteImport.update({
+  id: '/bridge',
+  path: '/bridge',
   getParentRoute: () => rootRouteImport,
 } as any);
 const IndexRoute = IndexRouteImport.update({
@@ -28,39 +35,58 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ProtectedDashboardRoute = ProtectedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => ProtectedRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
-  '/dashboard': typeof DashboardRoute;
+  '/bridge': typeof BridgeRoute;
   '/login': typeof LoginRoute;
+  '/protected': typeof ProtectedRouteWithChildren;
+  '/protected/dashboard': typeof ProtectedDashboardRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
-  '/dashboard': typeof DashboardRoute;
+  '/bridge': typeof BridgeRoute;
   '/login': typeof LoginRoute;
+  '/protected': typeof ProtectedRouteWithChildren;
+  '/protected/dashboard': typeof ProtectedDashboardRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
-  '/dashboard': typeof DashboardRoute;
+  '/bridge': typeof BridgeRoute;
   '/login': typeof LoginRoute;
+  '/protected': typeof ProtectedRouteWithChildren;
+  '/protected/dashboard': typeof ProtectedDashboardRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/dashboard' | '/login';
+  fullPaths: '/' | '/bridge' | '/login' | '/protected' | '/protected/dashboard';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/dashboard' | '/login';
-  id: '__root__' | '/' | '/dashboard' | '/login';
+  to: '/' | '/bridge' | '/login' | '/protected' | '/protected/dashboard';
+  id: '__root__' | '/' | '/bridge' | '/login' | '/protected' | '/protected/dashboard';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
-  DashboardRoute: typeof DashboardRoute;
+  BridgeRoute: typeof BridgeRoute;
   LoginRoute: typeof LoginRoute;
+  ProtectedRoute: typeof ProtectedRouteWithChildren;
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/protected': {
+      id: '/protected';
+      path: '/protected';
+      fullPath: '/protected';
+      preLoaderRoute: typeof ProtectedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/login': {
       id: '/login';
       path: '/login';
@@ -68,11 +94,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/dashboard': {
-      id: '/dashboard';
-      path: '/dashboard';
-      fullPath: '/dashboard';
-      preLoaderRoute: typeof DashboardRouteImport;
+    '/bridge': {
+      id: '/bridge';
+      path: '/bridge';
+      fullPath: '/bridge';
+      preLoaderRoute: typeof BridgeRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/': {
@@ -82,13 +108,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/protected/dashboard': {
+      id: '/protected/dashboard';
+      path: '/dashboard';
+      fullPath: '/protected/dashboard';
+      preLoaderRoute: typeof ProtectedDashboardRouteImport;
+      parentRoute: typeof ProtectedRoute;
+    };
   }
 }
 
+interface ProtectedRouteChildren {
+  ProtectedDashboardRoute: typeof ProtectedDashboardRoute;
+}
+
+const ProtectedRouteChildren: ProtectedRouteChildren = {
+  ProtectedDashboardRoute: ProtectedDashboardRoute,
+};
+
+const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(ProtectedRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  BridgeRoute: BridgeRoute,
   LoginRoute: LoginRoute,
+  ProtectedRoute: ProtectedRouteWithChildren,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

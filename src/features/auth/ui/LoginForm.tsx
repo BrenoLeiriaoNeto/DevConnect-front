@@ -1,9 +1,15 @@
 import { Button, PasswordInput, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { useNavigate } from '@tanstack/react-router';
 
 import { apiClient } from '@/app/api/axios';
+import { accessTokenAtom } from '@/shared/state/auth.atoms';
+import { jotaiStore } from '@/shared/state/store';
+import { userAtom } from '@/shared/state/user.atoms';
 
 export default function LoginForm() {
+  const navigate = useNavigate();
+
   const form = useForm({
     initialValues: {
       email: '',
@@ -16,12 +22,23 @@ export default function LoginForm() {
   });
 
   const handleSubmit = async (values: typeof form.values) => {
-    console.log('Login:', values);
     try {
-      const res = await apiClient.post('/auth/login', values);
-      console.log('Login response:', res.data);
+      const { data } = await apiClient.post('/auth/login', values);
+      console.log('Data -> ', data);
+
+      jotaiStore.set(accessTokenAtom, data.accessToken);
+
+      if (data.user) {
+        jotaiStore.set(userAtom, data.user);
+      }
+
+      navigate({ to: '/protected/dashboard' });
     } catch (error) {
       console.error('Login failed:', error);
+      form.setErrors({
+        email: '',
+        password: 'Invalid credentials or account issue',
+      });
     }
   };
 
