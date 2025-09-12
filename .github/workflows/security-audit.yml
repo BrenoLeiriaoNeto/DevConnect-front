@@ -1,0 +1,99 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+  schedule:
+    - cron: '0 3 * * 1'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    outputs:
+      summary: ${{ steps.collect.outputs.summary }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run security audit
+        id: audit
+        run: |
+          set +e
+          pnpm audit --audit-level=high > audit-output.txt 2>&1
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          head -n 20 audit-output.txt > audit-summary.txt
+          exit $EXIT_CODE || true
+
+      - name: Targeted npm attack check
+        id: targeted
+        run: |
+          echo "🔍 Checking for known compromised npm package versions..."
+          BAD_VERSIONS="ansi-regex@6.2.1|ansi-styles@6.2.2|chalk@5.6.1|chalk-template@1.1.1|color-convert@3.1.1|color-name@2.0.1|color-string@2.1.1|debug@4.4.2|error-ex@1.3.3|has-ansi@6.0.1|is-arrayish@0.3.3|proto-tinker-wc@1.8.7|supports-hyperlinks@4.1.1|simple-swizzle@0.2.3|slice-ansi@7.1.1|strip-ansi@7.1.1|supports-color@10.2.1|wrap-ansi@9.0.1"
+          if grep -E "$BAD_VERSIONS" pnpm-lock.yaml; then
+            echo "❌ Found compromised package versions!" > targeted-summary.txt
+            grep -E "$BAD_VERSIONS" pnpm-lock.yaml >> targeted-summary.txt
+            exit 1
+          else
+            echo "✅ No compromised package versions found." > targeted-summary.txt
+          fi
+
+      - name: Collect summaries
+        id: collect
+        run: |
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "=== pnpm audit (top 20 lines) ===" >> $GITHUB_OUTPUT
+          cat audit-summary.txt >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "=== Targeted package check ===" >> $GITHUB_OUTPUT
+          cat targeted-summary.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  notify:
+    needs: [audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord notification
+        uses: Ilshidur/action-discord@0.4.0
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        with:
+          args: |
+            {
+              "embeds": [{
+                "title": "📢 Security Audit Report",
+                "color": ${{ needs.audit.result == 'success' && 3066993 || 15158332 }},
+                "fields": [
+                  { "name": "Repository", "value": "${{ github.repository }}", "inline": true },
+                  { "name": "Branch", "value": "${{ github.ref_name }}", "inline": true },
+                  { "name": "Actor", "value": "${{ github.actor }}", "inline": true },
+                  { "name": "Commit", "value": "[${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})", "inline": false },
+                  { "name": "Workflow Run", "value": "[View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false },
+                  { "name": "Status", "value": "${{ needs.audit.result == 'success' && '✅ Passed' || '❌ Failed' }}", "inline": true },
+                  { "name": "Event", "value": "${{ github.event_name }}", "inline": true },
+                  { "name": "PR Title", "value": "${{ github.event.pull_request.title || 'N/A' }}", "inline": false }${
+                    needs.audit.result != 'success'
+                      ? `,
+                  { "name": "Vulnerabilities", "value": "```${{ needs.audit.outputs.summary }}```", "inline": false }`
+                      : ''
+                  }
+                ],
+                "timestamp": "${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}"
+              }]
+            }
