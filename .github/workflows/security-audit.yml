@@ -73,11 +73,29 @@ jobs:
         id: collect
         run: |
           echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "=== High/Critical runtime vulnerabilities (top 20) ===" >> $GITHUB_OUTPUT
-          cat audit-summary.txt >> $GITHUB_OUTPUT
+
+          echo "**🔍 Security Audit Summary**" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          echo "=== Targeted package check ===" >> $GITHUB_OUTPUT
-          cat targeted-summary.txt >> $GITHUB_OUTPUT
+
+          if [ -s audit-summary.txt ]; then
+            COUNT=$(wc -l < audit-summary.txt | tr -d ' ')
+            echo "⚠️ **$COUNT high/critical runtime vulnerabilities found:**" >> $GITHUB_OUTPUT
+            while IFS= read -r line; do
+              echo "   • $line" >> $GITHUB_OUTPUT
+            done < audit-summary.txt
+            if [ "$COUNT" -gt 20 ]; then
+              echo "   _(showing first 20 results)_" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "✅ No high/critical runtime vulnerabilities found." >> $GITHUB_OUTPUT
+          fi
+      
+          echo "" >> $GITHUB_OUTPUT
+          echo "**🎯 Targeted Package Check**" >> $GITHUB_OUTPUT
+          while IFS= read -r line; do
+            echo "   • $line" >> $GITHUB_OUTPUT
+          done < targeted-summary.txt
+      
           echo "EOF" >> $GITHUB_OUTPUT
 
   notify:
